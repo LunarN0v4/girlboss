@@ -58,8 +58,8 @@ const guestcommands = {
                     const contact = await getcontacts(phonenumber, envelope.sourceUuid);
                     const profile = contact.profile;
                     let name;
-                    if (profile && profile.givenName && profile.givenName !== null) {
-                        name = profile.givenName;
+                    if (profile && profile.givenName && profile.givenName !== null && profile.familyName && profile.familyName !== null) {
+                        name = profile.givenName + (profile.familyName ? ` ${profile.familyName}` : '');
                     } else {
                         name = 'Unknown';
                     }
@@ -149,7 +149,6 @@ const usercommands = {
                     }
                     return String(value);
                 };
-
                 for (const prop in properties) {
                     if (prop === 'authkey') {
                         pm += `authkey: [womp womp no key 4 u]\n`;
@@ -215,9 +214,7 @@ const usercommands = {
                 const akbuf = Buffer.from(user.properties.authkey.key);
                 const cbuf = Buffer.concat([sidbuf, akbuf]);
                 const token = cbuf.toString('base64');
-                
                 const am = `Hiya $MENTIONUSER!\nYour AuthKey is:\n${token}\n\nYou can use this key for sites like https://tritiumweb.zeusteam.dev/ that use ${botname} as an SSO provider`;
-                
                 if (envelope.dataMessage) {
                     const dataMessage = envelope.dataMessage;
                     const groupInfo = dataMessage.groupInfo;
@@ -263,7 +260,8 @@ const usercommands = {
                 });
                 await featurereq.save();
                 await sendresponse(`Your feature request has been submitted with ID ${reqid}.\nThank you!`, envelope, `${prefix}featurereq`, false);
-                await sendmessage(`New feature request from ${user.username} (${envelope.sourceUuid}):\nRequest ID: ${reqid}\nFeature: ${feature}`, managedaccount, phonenumber);
+                const displayname = user.properties && user.properties.nickname ? user.properties.nickname : user.username;
+                await sendmessage(`New feature request from ${displayname} (${envelope.sourceUuid}):\nRequest ID: ${reqid}\nFeature: ${feature}`, managedaccount, phonenumber);
             } catch (err) {
                 await sendresponse('Failed to submit your feature request. Please try again later.', envelope, `${prefix}featurereq`, true);
             }
@@ -321,7 +319,6 @@ const usercommands = {
                     await sendresponse('Invalid vote. Please provide a valid option number.', envelope, `${prefix}poll`, true);
                     return;
                 }
-                
                 if (!poll.voters) {
                     poll.voters = [];
                 }
@@ -329,7 +326,6 @@ const usercommands = {
                     await sendresponse('You have already voted on this poll.', envelope, `${prefix}poll`, true);
                     return;
                 }
-                
                 if (!poll.votes || !Array.isArray(poll.votes)) {
                     poll.votes = Array(poll.options.length).fill(0);
                 }
@@ -387,7 +383,19 @@ const usercommands = {
                     return;
                 }
                 if (!match[2]) {
-                    await sendresponse('Invalid arguments. Use "-module [module] [enable/disable]" to enable or disable a module.', envelope, `${prefix}module`, true);
+                    const module = match[1].toLowerCase();
+                    if (!user.properties) {
+                        user.properties = {};
+                    }
+                    if (!user.properties.tags) {
+                        user.properties.tags = [];
+                    }
+                    if (!avamods.some(m => m.section === module)) {
+                        await sendresponse(`Module "${module}" doesn't appear to exist.`, envelope, `${prefix}module`, true);
+                        return;
+                    }
+                    const enabled = user.properties.tags.includes(module);
+                    await sendresponse(`Module "${module}" is ${enabled ? 'enabled' : 'disabled'}.`, envelope, `${prefix}module`, false);
                     return;
                 }
                 const module = match[1].toLowerCase();
@@ -661,7 +669,7 @@ const adminonlycommands = {
                     const profile = contact ? contact.profile : {};
                     const name = profile.givenName + (profile.familyName ? ` ${profile.familyName}` : '');
                     if (profile.givenName && (!user.username || user.username !== profile.givenName)) {
-                        user.username = profile.givenName;
+                        user.username = profile.givenName + (profile.familyName ? ` ${profile.familyName}` : '');
                         user.save().catch(err => console.error('Failed to save username:', err));
                     }
                     return {
@@ -673,7 +681,7 @@ const adminonlycommands = {
                 });
                 let ul = 'Users:\n';
                 ulm.forEach(user => {
-                    ul += `- ${user.userid} (${user.name}) (Is Admin: ${user.accesslevel === 1 ? 'true' : 'false'})${user.tags.length > 0 ? ` (Tags: ${user.tags.join(', ')})` : ''}\n`;
+                    ul += `- ${user.userid} (${user.name})${user.accesslevel === 1 ? ' (Admin)' : ''}${user.tags.length > 0 ? ` (Tags: ${user.tags.join(', ')})` : ''}\n`;
                 });
                 await sendresponse(ul.trim(), envelope, `${prefix}getusers`, false);
             } catch (err) {
@@ -1247,6 +1255,15 @@ const modules = [
             await user.save();
         }
     },
+    /*{
+        section: "fun",
+        commands: funcommands,
+        user: true,
+        admin: false,
+        execute: async (user) => {
+            return;
+        }
+    },*/
     {
         section: "admin",
         commands: adminonlycommands,
@@ -1269,6 +1286,11 @@ async function invokecommand(command, envelope) {
     const user = await User.findOne({ userid: envelope.sourceUuid });
     const dataMessage = envelope.dataMessage;
     let message
+    if (user && envelope.sourceName && envelope.sourceName !== user.username) {
+        user.username = envelope.sourceName;
+        user.markModified('username');
+        await user.save().catch(err => console.error('Failed to save username:', err));
+    }
     if (dataMessage && dataMessage.message) {
         message = dataMessage.message.trim();
     } else {

@@ -44,6 +44,7 @@ function exportmodels(mongoosecon=mongoosefcon) {
         question: String,
         options: [String],
         votes: [Number],
+        voters: [String],
     });
     const featurereqSchema = new mongoose.Schema({
         reqid: String,
