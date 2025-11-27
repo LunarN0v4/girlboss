@@ -409,10 +409,86 @@ function sendresponse(message, envelope, command, failed=false, props={}) {
     }
 };
 
+async function trustfix() {
+    const executefix = async () => {
+        persistentconn(() => {
+            if (!client || client.destroyed || client.readyState !== 'open') {
+                console.error('No handler connection available for trust fix');
+                return;
+            }
+            const tid = Math.floor(Math.random() * 1024) + 1;
+            const id = tid.toString();
+            let json = {
+                jsonrpc: '2.0',
+                id,
+                method: 'listIdentities',
+                params: {
+                    account: phonenumber,
+                },
+            };
+            json = JSON.stringify(json);
+            client.write(json + '\n');
+            let buffer = '';
+            const responsehandler = async (data) => {
+                buffer += data.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    const content = line.trim();
+                    if (content == null || content === '' || content === undefined) {
+                        continue;
+                    }
+                    try {
+                        const pj = JSON.parse(content);
+                        if (pj.id === id) {
+                            client.removeListener('data', responsehandler);
+                            if (pj.error) {
+                                console.error('Error listing identities for trust fix:', pj.error);
+                                return;
+                            }
+                            const result = pj.result;
+                            for (const identity of result) {
+                                if (identity.trustLevel !== 'TRUSTED_VERIFIED') {
+                                    const tid2 = Math.floor(Math.random() * 1024) + 1;
+                                    const id2 = tid2.toString();
+                                    let json2 = {
+                                        jsonrpc: '2.0',
+                                        id: id2,
+                                        method: 'trust',
+                                        params: {
+                                            account: phonenumber,
+                                            recipient: identity.uuid,
+                                            verifiedSafetyNumber: identity.safetyNumber,
+                                        },
+                                    };
+                                    json2 = JSON.stringify(json2);
+                                    client.write(json2 + '\n');
+                                }
+                            }
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error parsing JSON for trust fix:', error);
+                    }
+                }
+            };
+            client.on('data', responsehandler);
+            setTimeout(() => {
+                client.removeListener('data', responsehandler);
+            }, 10000);
+        });
+    }
+    await executefix();
+    setInterval(async () => {
+        await executefix()
+    }, 5 * 60 * 1000);
+}
+
 export {
     interpretmessage,
     sendmessage,
     sendresponse,
     sendtypingindicator,
     getcontacts,
+    trustfix,
 };

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import subprocess from 'child_process';
 import net from 'net';
-import { interpretmessage } from './signalhandler.js';
+import { interpretmessage, trustfix } from './signalhandler.js';
 import { initialisewebhookhandler } from './webhandler.js';
 import { parse } from 'jsonc-parser';
 
@@ -126,6 +126,7 @@ function setupbotprofile() {
     client.on('error', (error) => {
         console.error('Error sending profile data via Signal CLI:', error);
     });
+    trustfix();
 }
 
 function main() {
