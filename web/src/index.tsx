@@ -13,8 +13,6 @@ config = undefined;
 const mongoose = exportmodels(mongoosecon);
 const redis = new Redis(rediscon);
 
-const ae2Connections = new Map();
-
 redis.on('error', (err) => {
     console.error('GirlbossWeb Redis connection error:', err);
 });
