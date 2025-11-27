@@ -10,6 +10,8 @@ services:
         volumes:
             - ./:/app:rw
         attach: false
+        logging:
+            driver: none
     tritium:
         build:
             context: .
@@ -39,7 +41,7 @@ services:
         command: ["--log_dir=/var/log/dragonfly", "--snapshot_cron=0 */6 * * *"]
         volumes:
             - ./data/dragonfly:/data:rw
-    authtest:
+    web:
         build:
             context: .
             dockerfile: ./Web.Dockerfile
