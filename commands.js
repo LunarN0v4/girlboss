@@ -661,7 +661,15 @@ const builtincommands = {
         arguments: null,
         execute: async (envelope, message) => {
             try {
-                await sendresponse(`${botname} v${process.env.npm_package_version} running on ${os.type()} ${os.release()} (${os.arch()})\nBased on LunarN0v4/tritiumbotv2 (https://git.zeusteam.dev/nova/tritiumbotv2).`, envelope, `${prefix}info`, false);
+                const pkg = await Bun.file("./package.json").json();
+                await sendresponse(`${process.env.npm_package_name} (colloquially named "${botname}") v${process.env.npm_package_version} running on ${os.type()} ${os.release()} (${os.arch()})
+Licensed with ${pkg.license}, developed by ${pkg.author}.
+Source links:
+- https://git.zeusteam.dev/nova/girlboss
+- https://codeberg.org/nxva/girlboss
+- https://github.com/LunarN0v4/girlboss
+
+Based on tritiumbotv2 by Nova Arctic (https://git.zeusteam.dev/nova/tritiumbotv2).`, envelope, `${prefix}info`, false);
             } catch (err) {
                 console.error(err);
             }
