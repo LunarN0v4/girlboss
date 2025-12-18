@@ -383,6 +383,76 @@ function getcontacts(account=phonenumber, recipient=undefined) {
     });
 }
 
+function getgroups(account=phonenumber) {
+    return new Promise((resolve, reject) => {
+        persistentconn(() => {
+            if (!client || client.destroyed || client.readyState !== 'open') {
+                console.error('No handler connection available for getting groups');
+                reject(new Error('No handler connection available'));
+                return;
+            }
+            const tid = Math.floor(Math.random() * 1024) + 1;
+            const id = tid.toString();
+            let json = {
+                jsonrpc: '2.0',
+                id,
+                method: 'listGroups',
+                params: {
+                    account: account,
+                },
+            };
+            json = JSON.stringify(json);
+            client.write(json + '\n');
+            let buffer = '';
+            const responsehandler = (data) => {
+                buffer += data.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    const content = line.trim();
+                    if (content == null || content === '' || content === undefined) {
+                        continue;
+                    }
+                    try {
+                        const pj = JSON.parse(content);
+                        if (pj.id === id) {
+                            client.removeListener('data', responsehandler);
+                            if (pj.error) {
+                                console.error('Error getting groups:', pj.error);
+                                reject(new Error('Error getting groups: ' + JSON.stringify(pj.error)));
+                                return;
+                            }
+                            const result = pj.result;
+                            resolve(result);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error parsing JSON:', error);
+                    }
+                }
+            };
+
+            client.on('data', responsehandler);
+            const timeid = setTimeout(() => {
+                client.removeListener('data', responsehandler);
+                reject(new Error('Timeout waiting for groups response'));
+            }, 5000);
+            const or = resolve;
+            const ore = reject;
+            resolve = (...args) => {
+                clearTimeout(timeid);
+                client.removeListener('data', responsehandler);
+                or(...args);
+            };
+            reject = (...args) => {
+                clearTimeout(timeid);
+                client.removeListener('data', responsehandler);
+                ore(...args);
+            };
+        });
+    });
+}
+
 function sendresponse(message, envelope, command, failed=false, props={}) {
     const recipient = envelope.sourceUuid;
     const dataMessage = envelope.dataMessage;
@@ -490,5 +560,6 @@ export {
     sendresponse,
     sendtypingindicator,
     getcontacts,
+    getgroups,
     trustfix,
 };

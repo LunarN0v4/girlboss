@@ -87,67 +87,81 @@ export default {
                         return;
                     }
                     const host = match[1];
-                    const recordtype = match[2].toLowerCase();
+                    if (!host) {
+                        await sendresponse('You must provide a host to look up.\nUsage: -dig [host] [type]', envelope, `${prefix}dig`, true);
+                        return;
+                    }
+                    const recordtype = match[2]?.toLowerCase();
                     let result;
-                    let responsemsg = `DNS lookup for ${host} (${recordtype.toUpperCase()}):\n\n`;
+                    let afr;
+                    let responsemsg = `DNS lookup for ${host} (${recordtype?.toUpperCase() || 'A'}):\n\n`;
                     switch (recordtype) {
+                        case undefined:
+                            result = await dns.resolve4(host);
+                            responsemsg += `A Records:\n${result.map(ip => `- ${ip}`).join('\n')}`;
+                            break;
                         case 'a':
                             result = await dns.resolve4(host);
-                            responsemsg += `A Records:\n${result.map(ip => `  ${ip}`).join('\n')}`;
+                            responsemsg += `A Records:\n${result.map(ip => `- ${ip}`).join('\n')}`;
                             break;
                         case 'aaaa':
                             result = await dns.resolve6(host);
-                            responsemsg += `AAAA Records:\n${result.map(ip => `  ${ip}`).join('\n')}`;
+                            responsemsg += `AAAA Records:\n${result.map(ip => `- ${ip}`).join('\n')}`;
                             break;
                         case 'mx':
                             result = await dns.resolveMx(host);
-                            responsemsg += `MX Records:\n${result.map(mx => `  ${mx.priority} ${mx.exchange}`).join('\n')}`;
+                            responsemsg += `MX Records:\n${result.map(mx => `- ${mx.priority} ${mx.exchange}`).join('\n')}`;
                             break;
                         case 'txt':
                             result = await dns.resolveTxt(host);
-                            responsemsg += `TXT Records:\n${result.map(txt => `  "${txt.join('""')}"`).join('\n')}`;
+                            responsemsg += `TXT Records:\n${result.map(txt => `- "${txt.join('""')}"`).join('\n')}`;
                             break;
                         case 'cname':
                             result = await dns.resolveCname(host);
-                            responsemsg += `CNAME Records:\n${result.map(cname => `  ${cname}`).join('\n')}`;
+                            responsemsg += `CNAME Records:\n${result.map(cname => `- ${cname}`).join('\n')}`;
                             break;
                         case 'ns':
                             result = await dns.resolveNs(host);
-                            responsemsg += `NS Records:\n${result.map(ns => `  ${ns}`).join('\n')}`;
+                            responsemsg += `NS Records:\n${result.map(ns => `- ${ns}`).join('\n')}`;
                             break;
                         case 'ptr':
                             result = await dns.resolvePtr(host);
-                            responsemsg += `PTR Records:\n${result.map(ptr => `  ${ptr}`).join('\n')}`;
+                            responsemsg += `PTR Records:\n${result.map(ptr => `- ${ptr}`).join('\n')}`;
                             break;
                         case 'soa':
                             result = await dns.resolveSoa(host);
-                            responsemsg += `SOA Record:\n  Primary: ${result.nsname}\n  Admin: ${result.hostmaster}\n  Serial: ${result.serial}\n  Refresh: ${result.refresh}\n  Retry: ${result.retry}\n  Expire: ${result.expire}\n  TTL: ${result.minttl}`;
+                            responsemsg += `SOA Record:\n- Primary: ${result.nsname}\n- Admin: ${result.hostmaster}\n- Serial: ${result.serial}\n- Refresh: ${result.refresh}\n- Retry: ${result.retry}\n- Expire: ${result.expire}\n- TTL: ${result.minttl}`;
                             break;
                         case 'srv':
                             result = await dns.resolveSrv(host);
-                            responsemsg += `SRV Records:\n${result.map(srv => `  ${srv.priority} ${srv.weight} ${srv.port} ${srv.name}`).join('\n')}`;
+                            responsemsg += `SRV Records:\n${result.map(srv => `- ${srv.priority} ${srv.weight} ${srv.port} ${srv.name}`).join('\n')}`;
                             break;
                         case 'any':
                             responsemsg = `DNS lookup for ${host} (ALL):\n\n`;
                             try {
                                 const a = await dns.resolve4(host).catch(() => null);
-                                if (a) responsemsg += `A Records:\n${a.map(ip => `  ${ip}`).join('\n')}\n\n`;
+                                afr = true;
+                                if (a) responsemsg += `A Records:\n${a.map(ip => `- ${ip}`).join('\n')}\n\n`;
                             } catch (e) {}
                             try {
                                 const aaaa = await dns.resolve6(host).catch(() => null);
-                                if (aaaa) responsemsg += `AAAA Records:\n${aaaa.map(ip => `  ${ip}`).join('\n')}\n\n`;
+                                afr = true;
+                                if (aaaa) responsemsg += `AAAA Records:\n${aaaa.map(ip => `- ${ip}`).join('\n')}\n\n`;
                             } catch (e) {}
                             try {
                                 const mx = await dns.resolveMx(host).catch(() => null);
-                                if (mx) responsemsg += `MX Records:\n${mx.map(mx => `  ${mx.priority} ${mx.exchange}`).join('\n')}\n\n`;
+                                afr = true;
+                                if (mx) responsemsg += `MX Records:\n${mx.map(mx => `- ${mx.priority} ${mx.exchange}`).join('\n')}\n\n`;
                             } catch (e) {}
                             try {
                                 const txt = await dns.resolveTxt(host).catch(() => null);
-                                if (txt) responsemsg += `TXT Records:\n${txt.map(txt => `  "${txt.join('""')}"`).join('\n')}\n\n`;
+                                afr = true;
+                                if (txt) responsemsg += `TXT Records:\n${txt.map(txt => `- "${txt.join('""')}"`).join('\n')}\n\n`;
                             } catch (e) {}
                             try {
                                 const ns = await dns.resolveNs(host).catch(() => null);
-                                if (ns) responsemsg += `NS Records:\n${ns.map(ns => `  ${ns}`).join('\n')}\n\n`;
+                                afr = true;
+                                if (ns) responsemsg += `NS Records:\n${ns.map(ns => `- ${ns}`).join('\n')}\n\n`;
                             } catch (e) {}
                             responsemsg = responsemsg.trim();
                             break;
@@ -155,18 +169,18 @@ export default {
                             await sendresponse(`Unsupported record type: ${recordtype}\nSupported types: A, AAAA, MX, TXT, CNAME, NS, PTR, SOA, SRV, ANY`, envelope, `${prefix}dig`, true);
                             return;
                     }
-                    if (!result || (Array.isArray(result) && result.length === 0)) {
+                    if ((!result || (Array.isArray(result) && result.length === 0)) || (afr && afr === true)) {
                         await sendresponse(`No ${recordtype.toUpperCase()} records found for ${host}`, envelope, `${prefix}dig`, true);
                         return;
                     }
                     await sendresponse(responsemsg, envelope, `${prefix}dig`, false);
                 } catch (err) {
-                    console.error('DNS lookup error:', err);
                     if (err.code === 'ENOTFOUND') {
-                        await sendresponse(`Domain not found: ${match ? match[1] : 'unknown'}`, envelope, `${prefix}dig`, true);
+                        await sendresponse(`Host not found`, envelope, `${prefix}dig`, true);
                     } else if (err.code === 'ENODATA') {
-                        await sendresponse(`No ${match ? match[2].toUpperCase() : 'DNS'} records found for ${match ? match[1] : 'unknown'}`, envelope, `${prefix}dig`, true);
+                        await sendresponse(`None of that record type found for host.`, envelope, `${prefix}dig`, true);
                     } else {
+                        console.error('DNS lookup error:', err);
                         await sendresponse('Failed to retrieve DNS information. Please try again later.', envelope, `${prefix}dig`, true);
                     }
                 }

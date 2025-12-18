@@ -1,4 +1,4 @@
-import { mongoose, prefix, botname, phonenumber, managedaccount, sendresponse, sendmessage, getcontacts, parsecommand } from '../modulecontext.js'
+import { mongoose, prefix, botname, phonenumber, managedaccount, sendresponse, sendmessage, getcontacts, getgroups, parsecommand } from '../modulecontext.js'
 
 export default {
     section: "admin",
@@ -136,6 +136,62 @@ export default {
                     await sendresponse(ul.trim(), envelope, `${prefix}getusers`, false);
                 } catch (err) {
                     await sendresponse('Failed to retrieve users. Please try again later.', envelope, `${prefix}getusers`, true);
+                }
+            }
+        },
+        "getgroups": {
+            description: "Get all groups from signal-cli",
+            arguments: null,
+            execute: async (envelope, message) => {
+                try {
+                    const User = mongoose.model('User');
+                    const users = await User.find({});
+                    if (users.length === 0) {
+                        await sendresponse('No users found in the database.', envelope, `${prefix}getusers`, true);
+                        return;
+                    }
+                    let groups;
+                    try {
+                        groups = await getgroups();
+                    } catch (err) {
+                        console.error('Failed to retrieve groups:', err);
+                        await sendresponse('Failed to retrieve groups. Please check the logs for more information.', envelope, `${prefix}getusers`, true);
+                        return;
+                    }
+                    if (!Array.isArray(groups)) {
+                        console.error('groups is not an array:', typeof groups, groups);
+                        await sendresponse('Invalid groups data received. Please check the logs for more information.', envelope, `${prefix}getusers`, true);
+                        return;
+                    }
+                    for (const group of groups) {
+                        console.log(`Group: ${group}`);
+                    }
+                    return;
+                    const ulm = users.map(user => {
+                        let contact;
+                        if (Array.isArray(contacts)) {
+                            contact = contacts.find(c => c.uuid === user.userid);
+                        }
+                        const profile = contact ? contact.profile : {};
+                        const name = profile.givenName + (profile.familyName ? ` ${profile.familyName}` : '');
+                        if (profile.givenName && (!user.username || user.username !== profile.givenName)) {
+                            user.username = profile.givenName + (profile.familyName ? ` ${profile.familyName}` : '');
+                            user.save().catch(err => console.error('Failed to save username:', err));
+                        }
+                        return {
+                            userid: user.userid,
+                            accesslevel: user.accesslevel,
+                            tags: user.properties ? user.properties.tags : [],
+                            name: name ? name : 'Unknown'
+                        };
+                    });
+                    let ul = 'Users:\n';
+                    ulm.forEach(user => {
+                        ul += `- ${user.userid} (${user.name})${user.accesslevel === 1 ? ' (Admin)' : ''}${user.tags.length > 0 ? ` (Tags: ${user.tags.join(', ')})` : ''}\n`;
+                    });
+                    await sendresponse(ul.trim(), envelope, `${prefix}getgroups`, false);
+                } catch (err) {
+                    await sendresponse('Failed to retrieve users. Please try again later.', envelope, `${prefix}getgroups`, true);
                 }
             }
         },

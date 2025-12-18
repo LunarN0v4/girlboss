@@ -661,7 +661,7 @@ const builtincommands = {
         arguments: null,
         execute: async (envelope, message) => {
             try {
-                await sendresponse(`${botname} v${process.env.npm_package_version} running on ${os.type()} ${os.release()} (${os.arch()})\nBased on LunarN0v4/tritiumbotv2 (https://github.com/LunarN0v4/tritiumbotv2).`, envelope, `${prefix}info`, false);
+                await sendresponse(`${botname} v${process.env.npm_package_version} running on ${os.type()} ${os.release()} (${os.arch()})\nBased on LunarN0v4/tritiumbotv2 (https://git.zeusteam.dev/nova/tritiumbotv2).`, envelope, `${prefix}info`, false);
             } catch (err) {
                 console.error(err);
             }
@@ -843,11 +843,11 @@ async function invokeselfcommand(command, envelope) {
     } else if (usercommands[propercommand]) {
         await usercommands[propercommand].execute(envelope, message);
     } else {
+        const User = mongoose.model('User');
+        const user = await User.findOne({ userid: envelope.sourceUuid });
         const located = findmodulecommand(propercommand);
         if (located) {
             const { mod, command: cmdobj } = located;
-            const User = mongoose.model('User');
-            const user = await User.findOne({ userid: envelope.sourceUuid });
             if (mod.admin && (!user || user.accesslevel !== 1)) {
                 await sendresponse(`Unknown command: ${command}`, envelope, command, true);
                 return;

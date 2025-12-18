@@ -53,7 +53,7 @@ function parsecommand(message) {
     if (current) tokens.push(current);
     return [command, ...tokens];
 }
-const { sendresponse, sendmessage, getcontacts } = signalhandler
+const { sendresponse, sendmessage, getcontacts, getgroups } = signalhandler
 
 const mc = new Map();
 const gt = () => Date.now();
@@ -79,4 +79,4 @@ const { exportmodels } = mongoosemodule
 const mongoose = exportmodels()
 const redis = new Redis(rediscon);
 
-export { redis, mongoose, prefix, botname, phonenumber, managedaccount, sendresponse, sendmessage, getcontacts, escapereg, parsecommand, hotreloadable }
+export { redis, mongoose, prefix, botname, phonenumber, managedaccount, sendresponse, sendmessage, getcontacts, getgroups, escapereg, parsecommand, hotreloadable }
